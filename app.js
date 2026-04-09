@@ -1,4 +1,11 @@
-import { deserializeState, getLegalMovesForCard } from "./game-engine.js";
+import {
+  createGame,
+  deserializeState,
+  getLegalMovesForCard,
+  playTurn,
+  serializeState,
+  turnInDeadCard,
+} from "./game-engine.js";
 
 const PLAYER_COLOR_CLASSES = ["player1", "player2", "player3", "player4"];
 const SEAT_LABELS = ["Blue", "Green", "Red", "Gold"];
@@ -11,14 +18,16 @@ const SUIT_SYMBOLS = {
 
 const app = document.querySelector("#app");
 
-let createForm = {
+let view = session?.roomId ? "online" : "menu";
+
+let localForm = {
   playerCount: 2,
-  names: ["Host", "Open Seat 2", "Open Seat 3", "Open Seat 4"],
+  names: ["Player 1", "Player 2", "Player 3", "Player 4"],
 };
 
-let joinForm = {
-  seatId: null,
-  displayName: "",
+let createForm = {
+  playerCount: 2,
+  hostName: "Host",
 };
 
 let session = loadSession();
@@ -26,6 +35,11 @@ let roomState = null;
 let pollTimer = null;
 let selectedHandIndex = null;
 let errorMessage = "";
+let localState = null;
+let joinForm = {
+  seatId: null,
+  displayName: "",
+};
 
 function loadSession() {
   const roomId = new URLSearchParams(window.location.search).get("room");
@@ -62,9 +76,13 @@ function clearRoomSession() {
   const url = new URL(window.location.href);
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url);
+  view = "menu";
 }
 
 function currentGame() {
+  if (localState) {
+    return serializeState(localState);
+  }
   return roomState?.game ?? null;
 }
 
@@ -74,8 +92,16 @@ function currentPlayer() {
 }
 
 function viewerPlayer() {
+  if (localState) {
+    const snapshot = serializeState(localState);
+    return snapshot.players[snapshot.currentPlayerIndex] ?? null;
+  }
   const game = currentGame();
   return game?.players.find((player) => player.player_id === game.viewerPlayerId) ?? null;
+}
+
+function isLocalGame() {
+  return Boolean(localState);
 }
 
 function parseCard(code) {
@@ -143,13 +169,16 @@ function hydratePlayerView(game) {
 }
 
 function getLegalMove() {
-  const game = currentGame();
   const viewer = viewerPlayer();
-  if (!game || !viewer || selectedHandIndex === null) {
+  if (!viewer || selectedHandIndex === null) {
     return null;
   }
 
   try {
+    if (localState) {
+      return getLegalMovesForCard(localState, viewer.player_id, selectedHandIndex);
+    }
+    const game = currentGame();
     return getLegalMovesForCard(hydratePlayerView(game), viewer.player_id, selectedHandIndex);
   } catch {
     return null;
@@ -222,7 +251,7 @@ async function createRoom() {
     method: "POST",
     body: JSON.stringify({
       playerCount: createForm.playerCount,
-      names: createForm.names.slice(0, createForm.playerCount),
+      names: [createForm.hostName],
     }),
   });
 
@@ -276,13 +305,131 @@ async function submitAction(action, extra = {}) {
   render();
 }
 
-function renderLanding() {
+function startLocalGame() {
+  localState = createGame({
+    players: Array.from({ length: localForm.playerCount }, (_, index) => ({
+      player_id: `player${index + 1}`,
+      display_name: localForm.names[index].trim() || `Player ${index + 1}`,
+    })),
+  });
+  selectedHandIndex = null;
+  errorMessage = "";
+}
+
+function leaveLocalGame() {
+  localState = null;
+  selectedHandIndex = null;
+  errorMessage = "";
+  view = "menu";
+}
+
+function renderHome() {
+  app.innerHTML = `
+    <div class="shell shell-setup">
+      <section class="setup-hero">
+        <p class="eyebrow">Sequence</p>
+        <h1>Play locally on one device or host a room online.</h1>
+        <p class="setup-copy">Use local hot-seat mode for quick same-device games. Use online mode when you want an invite link for friends.</p>
+      </section>
+
+      <section class="setup-panel">
+        <div class="mode-grid">
+          <button class="mode-card" id="choose-local">
+            <strong>Local Multiplayer</strong>
+            <span>2 to 4 players on a single device.</span>
+          </button>
+          <button class="mode-card" id="choose-online">
+            <strong>Online Room</strong>
+            <span>Create a room and let friends join by link.</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  `;
+
+  document.querySelector("#choose-local").addEventListener("click", () => {
+    view = "local-setup";
+    render();
+  });
+  document.querySelector("#choose-online").addEventListener("click", () => {
+    view = "online-setup";
+    render();
+  });
+}
+
+function renderLocalSetup() {
+  app.innerHTML = `
+    <div class="shell shell-setup">
+      <section class="setup-hero">
+        <p class="eyebrow">Local Multiplayer</p>
+        <h1>Set up a single-device hot-seat game.</h1>
+        <p class="setup-copy">All players share one screen. Choose the player count, enter names, and pass the device each turn.</p>
+      </section>
+
+      <section class="setup-panel">
+        <div class="count-picker">
+          <span class="label">Players</span>
+          <div class="count-options">
+            ${[2, 3, 4]
+              .map(
+                (count) => `
+                  <button class="count-option ${localForm.playerCount === count ? "active" : ""}" data-local-player-count="${count}">
+                    ${count} players
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="setup-grid">
+          ${Array.from({ length: localForm.playerCount }, (_, index) => `
+            <label class="setup-field">
+              <span>${SEAT_LABELS[index]} seat</span>
+              <div class="name-row">
+                <span class="setup-chip ${PLAYER_COLOR_CLASSES[index]}"></span>
+                <input type="text" data-local-name-index="${index}" value="${localForm.names[index]}" maxlength="24" />
+              </div>
+            </label>
+          `).join("")}
+        </div>
+
+        <div class="join-box">
+          <button class="count-option" id="back-home-local">Back</button>
+          <button id="start-local" class="start-game">Start Local Game</button>
+        </div>
+      </section>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-local-player-count]").forEach((button) => {
+    button.addEventListener("click", () => {
+      localForm.playerCount = Number(button.dataset.localPlayerCount);
+      render();
+    });
+  });
+  document.querySelectorAll("[data-local-name-index]").forEach((input) => {
+    input.addEventListener("input", () => {
+      localForm.names[Number(input.dataset.localNameIndex)] = input.value;
+    });
+  });
+  document.querySelector("#back-home-local").addEventListener("click", () => {
+    view = "menu";
+    render();
+  });
+  document.querySelector("#start-local").addEventListener("click", () => {
+    startLocalGame();
+    render();
+  });
+}
+
+function renderOnlineSetup() {
   app.innerHTML = `
     <div class="shell shell-setup">
       <section class="setup-hero">
         <p class="eyebrow">Sequence Online</p>
         <h1>Host a room, share the link, and play live.</h1>
-        <p class="setup-copy">This version runs as a room-based multiplayer game. The server owns the board state, and each player joins from their own browser.</p>
+        <p class="setup-copy">Create a room, choose the seat count, and share the invite. Other players choose their own name when they join.</p>
       </section>
 
       <section class="setup-panel">
@@ -302,19 +449,20 @@ function renderLanding() {
         </div>
 
         <div class="setup-grid">
-          ${Array.from({ length: createForm.playerCount }, (_, index) => `
-            <label class="setup-field">
-              <span>${SEAT_LABELS[index]} seat</span>
-              <div class="name-row">
-                <span class="setup-chip ${PLAYER_COLOR_CLASSES[index]}"></span>
-                <input type="text" data-name-index="${index}" value="${createForm.names[index]}" maxlength="24" />
-              </div>
-            </label>
-          `).join("")}
+          <label class="setup-field">
+            <span>${SEAT_LABELS[0]} seat</span>
+            <div class="name-row">
+              <span class="setup-chip ${PLAYER_COLOR_CLASSES[0]}"></span>
+              <input type="text" id="host-name" value="${createForm.hostName}" maxlength="24" />
+            </div>
+          </label>
         </div>
 
         ${errorMessage ? `<p class="error">${errorMessage}</p>` : ""}
-        <button id="create-room" class="start-game">Create Room</button>
+        <div class="join-box">
+          <button class="count-option" id="back-home-online">Back</button>
+          <button id="create-room" class="start-game">Create Room</button>
+        </div>
       </section>
     </div>
   `;
@@ -326,12 +474,14 @@ function renderLanding() {
     });
   });
 
-  document.querySelectorAll("[data-name-index]").forEach((input) => {
-    input.addEventListener("input", () => {
-      createForm.names[Number(input.dataset.nameIndex)] = input.value;
-    });
+  document.querySelector("#host-name").addEventListener("input", (event) => {
+    createForm.hostName = event.target.value;
   });
 
+  document.querySelector("#back-home-online").addEventListener("click", () => {
+    view = "menu";
+    render();
+  });
   document.querySelector("#create-room").addEventListener("click", async () => {
     try {
       await createRoom();
@@ -444,16 +594,17 @@ function renderGame() {
   const turn = currentPlayer();
   const legalMove = getLegalMove();
   const amCurrentPlayer = viewer?.player_id === game.currentPlayerId && !game.winner;
+  const roomOrLocalLabel = isLocalGame() ? "Local Game" : `Room ${roomState.roomId}`;
 
   app.innerHTML = `
     <div class="shell game-shell">
       <section class="topbar">
         <div>
-          <p class="eyebrow">Room ${roomState.roomId}</p>
-          <h1>Play Sequence live with your room.</h1>
+          <p class="eyebrow">${roomOrLocalLabel}</p>
+          <h1>${isLocalGame() ? "Play Sequence locally on one device." : "Play Sequence live with your room."}</h1>
         </div>
         <div class="actions">
-          <button id="leave-room">Leave Room</button>
+          <button id="leave-room">${isLocalGame() ? "Exit Local Game" : "Leave Room"}</button>
         </div>
       </section>
 
@@ -483,7 +634,7 @@ function renderGame() {
           <div class="table-frame">
             <div class="table-rail top">Shared board state</div>
             <div class="table-middle">
-              <div class="table-rail side left">Room play</div>
+              <div class="table-rail side left">${isLocalGame() ? "Hot-seat play" : "Room play"}</div>
               <div class="board">
                 ${game.board
                   .map(
@@ -520,7 +671,7 @@ function renderGame() {
               </div>
               <div class="table-rail side right">${amCurrentPlayer ? "Your move" : "Waiting"}</div>
             </div>
-            <div class="table-rail bottom">Invite others with the room link</div>
+            <div class="table-rail bottom">${isLocalGame() ? "Pass the device after each turn" : "Invite others with the room link"}</div>
           </div>
         </section>
 
@@ -558,7 +709,7 @@ function renderGame() {
                   <div class="player-row">
                     <div>
                       <strong>${player.display_name}</strong>
-                      <p>${player.handCount} in hand · ${player.discardCount} discarded</p>
+                      <p>${player.handCount ?? player.hand.length} in hand · ${player.discardCount ?? player.discard_pile.length} discarded</p>
                     </div>
                     <div class="seq-count">${player.sequences_completed} seq</div>
                   </div>
@@ -583,7 +734,11 @@ function renderGame() {
   `;
 
   document.querySelector("#leave-room").addEventListener("click", () => {
-    clearRoomSession();
+    if (isLocalGame()) {
+      leaveLocalGame();
+    } else {
+      clearRoomSession();
+    }
     render();
   });
 
@@ -602,12 +757,24 @@ function renderGame() {
       }
 
       try {
-        await submitAction("play-turn", {
-          handIndex: selectedHandIndex,
-          row: Number(button.dataset.row),
-          col: Number(button.dataset.col),
-        });
+        if (isLocalGame()) {
+          playTurn(
+            localState,
+            viewer.player_id,
+            selectedHandIndex,
+            Number(button.dataset.row),
+            Number(button.dataset.col),
+          );
+        } else {
+          await submitAction("play-turn", {
+            handIndex: selectedHandIndex,
+            row: Number(button.dataset.row),
+            col: Number(button.dataset.col),
+          });
+        }
         selectedHandIndex = null;
+        errorMessage = "";
+        render();
       } catch (error) {
         errorMessage = error.message;
         render();
@@ -619,10 +786,16 @@ function renderGame() {
   if (deadButton) {
     deadButton.addEventListener("click", async () => {
       try {
-        await submitAction("turn-in-dead", {
-          handIndex: selectedHandIndex,
-        });
+        if (isLocalGame()) {
+          turnInDeadCard(localState, viewer.player_id, selectedHandIndex);
+        } else {
+          await submitAction("turn-in-dead", {
+            handIndex: selectedHandIndex,
+          });
+        }
         selectedHandIndex = null;
+        errorMessage = "";
+        render();
       } catch (error) {
         errorMessage = error.message;
         render();
@@ -632,8 +805,21 @@ function renderGame() {
 }
 
 function render() {
+  if (localState) {
+    renderGame();
+    return;
+  }
+
   if (!session?.roomId) {
-    renderLanding();
+    if (view === "local-setup") {
+      renderLocalSetup();
+      return;
+    }
+    if (view === "online-setup") {
+      renderOnlineSetup();
+      return;
+    }
+    renderHome();
     return;
   }
 

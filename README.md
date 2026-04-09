@@ -1,29 +1,32 @@
-# Sequence Online
+# Sequence
 
-Multiplayer Sequence prototype for Vercel.
+Sequence supports two modes:
 
-## Local
+- Local multiplayer on one device
+- Online room hosting with invite links
+
+## Local run
 
 ```bash
 npm install
-npx vercel dev
+npm start
 ```
 
 Open `http://127.0.0.1:3000`.
 
-## Vercel Deployment
+## Internet deployment without Redis
 
-This app is serverless and expects a Redis database for persistent room state.
+This repo is set up for a single long-running Node web service. Deploy it to a platform like Render instead of Vercel if you do not want Redis.
 
-1. Create a Redis instance and copy its connection string into `REDIS_URL`.
-2. In Vercel, add the `REDIS_URL` environment variable to the project.
-3. Deploy the repo to Vercel.
+1. Push the repo to GitHub.
+2. Create a new Render Web Service from the repo.
+3. Use the included `render.yaml`, or set:
+   - Build command: `npm install`
+   - Start command: `npm start`
+4. Deploy.
 
-Without `REDIS_URL`, multiplayer rooms are not durable on Vercel.
+The app keeps room state in server memory, so it works without Redis on platforms that keep one Node process running.
 
-## Architecture
+## Important limitation
 
-- Static frontend: `index.html`, `app.js`, `styles.css`
-- Serverless API routes: `api/`
-- Game rules engine: `game-engine.js`
-- Room persistence: Redis in production, in-memory fallback outside Vercel
+In-memory room state is lost when the server restarts or redeploys. That is acceptable for casual rooms, but not for durable matchmaking.
