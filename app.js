@@ -35,10 +35,57 @@ let pollTimer = null;
 let selectedHandIndex = null;
 let errorMessage = "";
 let localState = null;
+let rulesOpen = false;
 let joinForm = {
   seatId: null,
   displayName: "",
 };
+
+const RULE_SECTIONS = [
+  {
+    title: "Setup",
+    items: [
+      "The board is a 10x10 grid. Corners are free spaces for every player.",
+      "Jacks do not appear on the board.",
+      "For 2 players, deal 7 cards each. For 3 to 4 players, deal 6 cards each.",
+      "In online mode, the host starts the room after all seats are claimed.",
+    ],
+  },
+  {
+    title: "How a Turn Works",
+    items: [
+      "Choose one card from your hand.",
+      "Place a chip on a matching open board space, then automatically draw a replacement card.",
+      "If both matching board spaces are already covered, that card is dead. Turn it in and draw a replacement, then continue your turn.",
+    ],
+  },
+  {
+    title: "Jacks",
+    items: [
+      "Two-eyed Jacks are wild and can place a chip on any open non-corner board space.",
+      "One-eyed Jacks remove one opponent chip from the board.",
+      "A One-eyed Jack cannot remove a chip that is already locked inside a completed sequence.",
+      "Playing a One-eyed Jack ends your turn. You do not place your own chip that turn.",
+    ],
+  },
+  {
+    title: "Sequences",
+    items: [
+      "A sequence is 5 connected chips in a row: horizontal, vertical, or diagonal.",
+      "Corners count for everyone, so you only need 4 of your own chips when using a corner in a sequence.",
+      "Completed sequences are locked and cannot be broken.",
+      "A second sequence may reuse one space from your first sequence.",
+    ],
+  },
+  {
+    title: "Winning",
+    items: [
+      "With 2 players, the first player to complete 2 sequences wins.",
+      "With 3 or 4 players, the first player to complete 1 sequence wins in this prototype.",
+      "If the draw deck runs out, discard piles are reshuffled into a new draw deck automatically.",
+    ],
+  },
+];
 
 function loadSession() {
   const roomId = new URLSearchParams(window.location.search).get("room");
@@ -334,21 +381,36 @@ function leaveLocalGame() {
 function renderHome() {
   app.innerHTML = `
     <div class="shell shell-setup">
-      <section class="setup-hero">
+      <section class="brand-stage">
+        <div class="brand-lockup">
+          <div class="brand-medallion">S</div>
+          <div class="brand-wordmark">Sequence</div>
+        </div>
+      </section>
+
+      <section class="setup-hero hero-card">
         <p class="eyebrow">Sequence</p>
         <h1>Play locally on one device or host a room online.</h1>
         <p class="setup-copy">Use local hot-seat mode for quick same-device games. Use online mode when you want an invite link for friends.</p>
       </section>
 
-      <section class="setup-panel">
+      <section class="setup-panel home-panel">
         <div class="mode-grid">
           <button class="mode-card" id="choose-local">
-            <strong>Local Multiplayer</strong>
-            <span>2 to 4 players on a single device.</span>
+            <div class="mode-icon">◉</div>
+            <div class="mode-copy">
+              <strong>Local Multiplayer</strong>
+              <span>2 to 4 players on a single device.</span>
+            </div>
+            <span class="mode-cta">Start Local Game</span>
           </button>
           <button class="mode-card" id="choose-online">
-            <strong>Online Room</strong>
-            <span>Create a room and let friends join by link.</span>
+            <div class="mode-icon">⌘</div>
+            <div class="mode-copy">
+              <strong>Online Room</strong>
+              <span>Create a room and let friends join by link.</span>
+            </div>
+            <span class="mode-cta">Host Online Room</span>
           </button>
         </div>
       </section>
@@ -368,7 +430,14 @@ function renderHome() {
 function renderLocalSetup() {
   app.innerHTML = `
     <div class="shell shell-setup">
-      <section class="setup-hero">
+      <section class="brand-stage compact-brand">
+        <div class="brand-lockup">
+          <div class="brand-medallion">S</div>
+          <div class="brand-wordmark">Sequence</div>
+        </div>
+      </section>
+
+      <section class="setup-hero hero-card">
         <p class="eyebrow">Local Multiplayer</p>
         <h1>Set up a single-device hot-seat game.</h1>
         <p class="setup-copy">All players share one screen. Choose the player count, enter names, and pass the device each turn.</p>
@@ -434,7 +503,14 @@ function renderLocalSetup() {
 function renderOnlineSetup() {
   app.innerHTML = `
     <div class="shell shell-setup">
-      <section class="setup-hero">
+      <section class="brand-stage compact-brand">
+        <div class="brand-lockup">
+          <div class="brand-medallion">S</div>
+          <div class="brand-wordmark">Sequence</div>
+        </div>
+      </section>
+
+      <section class="setup-hero hero-card">
         <p class="eyebrow">Sequence Online</p>
         <h1>Host a room, share the link, and play live.</h1>
         <p class="setup-copy">Create a room, choose the seat count, and share the invite. Other players choose their own name when they join.</p>
@@ -507,7 +583,14 @@ function renderLobby() {
 
   app.innerHTML = `
     <div class="shell shell-setup">
-      <section class="setup-hero">
+      <section class="brand-stage compact-brand">
+        <div class="brand-lockup">
+          <div class="brand-medallion">S</div>
+          <div class="brand-wordmark">Sequence</div>
+        </div>
+      </section>
+
+      <section class="setup-hero hero-card">
         <p class="eyebrow">Room ${roomState.roomId}</p>
         <h1>Share the invite, then start when every seat is filled.</h1>
         <p class="setup-copy">Invite link: <strong>${shareLink}</strong></p>
@@ -612,6 +695,7 @@ function renderGame() {
           <h1>${isLocalGame() ? "Play Sequence locally on one device." : "Play Sequence live with your room."}</h1>
         </div>
         <div class="actions">
+          <button id="open-rules" class="icon-button" aria-label="Open rules">?</button>
           <button id="leave-room">${isLocalGame() ? "Exit Local Game" : "Leave Room"}</button>
         </div>
       </section>
@@ -740,8 +824,43 @@ function renderGame() {
           </section>
         </aside>
       </main>
+
+      ${
+        rulesOpen
+          ? `
+            <div class="rules-overlay" id="rules-overlay">
+              <section class="rules-book" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+                <div class="rules-head">
+                  <div>
+                    <p class="eyebrow">Sequence Rules</p>
+                    <h2 id="rules-title">How to play and how to win.</h2>
+                  </div>
+                  <button id="close-rules" class="icon-button close-button" aria-label="Close rules">×</button>
+                </div>
+                <div class="rules-body">
+                  ${RULE_SECTIONS.map(
+                    (section) => `
+                      <section class="rules-section">
+                        <h3>${section.title}</h3>
+                        <ul>
+                          ${section.items.map((item) => `<li>${item}</li>`).join("")}
+                        </ul>
+                      </section>
+                    `,
+                  ).join("")}
+                </div>
+              </section>
+            </div>
+          `
+          : ""
+      }
     </div>
   `;
+
+  document.querySelector("#open-rules").addEventListener("click", () => {
+    rulesOpen = true;
+    render();
+  });
 
   document.querySelector("#leave-room").addEventListener("click", () => {
     if (isLocalGame()) {
@@ -808,6 +927,24 @@ function renderGame() {
         render();
       } catch (error) {
         errorMessage = error.message;
+        render();
+      }
+    });
+  }
+
+  const closeRulesButton = document.querySelector("#close-rules");
+  if (closeRulesButton) {
+    closeRulesButton.addEventListener("click", () => {
+      rulesOpen = false;
+      render();
+    });
+  }
+
+  const rulesOverlay = document.querySelector("#rules-overlay");
+  if (rulesOverlay) {
+    rulesOverlay.addEventListener("click", (event) => {
+      if (event.target === rulesOverlay) {
+        rulesOpen = false;
         render();
       }
     });
