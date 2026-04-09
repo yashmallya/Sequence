@@ -1,0 +1,12 @@
+{
+  "name": "sequence-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "redis": "^4.7.1"
+  }
+}
