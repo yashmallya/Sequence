@@ -217,6 +217,11 @@ function getFanStyle(index, total, selected) {
   return `--fan-rotate:${rotate}deg; --fan-lift:${lift}px; --fan-order:${index};`;
 }
 
+function playerColorClass(playerId) {
+  const seatIndex = Number(String(playerId).replace("player", "")) - 1;
+  return PLAYER_COLOR_CLASSES[seatIndex] ?? "";
+}
+
 function hydratePlayerView(game) {
   return deserializeState({
     ...game,
@@ -695,6 +700,9 @@ function renderGame() {
   const amCurrentPlayer = viewer?.player_id === game.currentPlayerId && !game.winner;
   const roomOrLocalLabel = isLocalGame() ? "Local Game" : `Room ${roomState.roomId}`;
   const winnerName = game.winner ? game.players.find((player) => player.player_id === game.winner)?.display_name : null;
+  const viewerColor = viewer ? playerColorClass(viewer.player_id) : "";
+  const turnColor = turn ? playerColorClass(turn.player_id) : "";
+  const recentMoves = game.log.slice(-4).reverse();
 
   app.innerHTML = `
     <div class="shell game-shell tabletop-shell">
@@ -702,7 +710,7 @@ function renderGame() {
         <button id="open-rules" class="hud-round" aria-label="Open rules">?</button>
         <div class="turn-banner">
           <div class="turn-seat">
-            <span class="seat-token ${viewer ? PLAYER_COLOR_CLASSES[Number(viewer.player_id.replace("player", "")) - 1] : ""}"></span>
+            <span class="seat-token ${viewerColor}"></span>
             <span>${viewer?.display_name ?? "Spectator"}</span>
           </div>
           <div class="turn-main">${winnerName ? `${winnerName} wins` : amCurrentPlayer ? "Your Turn" : `${turn?.display_name ?? "Unknown"} Turn`}</div>
@@ -716,94 +724,156 @@ function renderGame() {
 
       ${errorMessage ? `<p class="error">${errorMessage}</p>` : ""}
 
-      <main class="tabletop-stage">
-        <section class="board-zone">
-          <div class="table-frame">
-            <div class="table-rail top">Sequence</div>
-            <div class="table-middle">
-              <div class="table-rail side left">${isLocalGame() ? "Local Multiplayer" : roomOrLocalLabel}</div>
-              <div class="board">
-                ${game.board
-                  .map(
-                    (row, rowIndex) => `
-                      <div class="board-row">
-                        ${row
-                          .map((cell, colIndex) => {
-                            const isSelectable = amCurrentPlayer && legalMove?.positions.some(
-                              ([targetRow, targetCol]) => targetRow === rowIndex && targetCol === colIndex,
-                            );
-                            const isDimmed = amCurrentPlayer && legalMove && !isSelectable;
-                            const classes = [
-                              "cell",
-                              cell.occupied_by ? PLAYER_COLOR_CLASSES[Number(cell.occupied_by.replace("player", "")) - 1] : "",
-                              cell.is_sequence_locked ? "locked" : "",
-                              isSelectable ? "selectable" : "",
-                              isDimmed ? "dimmed" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ");
-                            const chipSeat = cell.occupied_by
-                              ? game.players.find((player) => player.player_id === cell.occupied_by)?.display_name.slice(0, 1).toUpperCase()
-                              : "";
+      <main class="tabletop-stage game-arena">
+        <section class="arena-layout">
+          <section class="board-stage">
+            <div class="table-frame">
+              <div class="table-rail top">Sequence</div>
+              <div class="table-middle">
+                <div class="table-rail side left">${isLocalGame() ? "Local Multiplayer" : roomOrLocalLabel}</div>
+                <div class="board">
+                  ${game.board
+                    .map(
+                      (row, rowIndex) => `
+                        <div class="board-row">
+                          ${row
+                            .map((cell, colIndex) => {
+                              const isSelectable = amCurrentPlayer && legalMove?.positions.some(
+                                ([targetRow, targetCol]) => targetRow === rowIndex && targetCol === colIndex,
+                              );
+                              const isDimmed = amCurrentPlayer && legalMove && !isSelectable;
+                              const classes = [
+                                "cell",
+                                cell.occupied_by ? playerColorClass(cell.occupied_by) : "",
+                                cell.is_sequence_locked ? "locked" : "",
+                                isSelectable ? "selectable" : "",
+                                isDimmed ? "dimmed" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ");
+                              const chipSeat = cell.occupied_by
+                                ? game.players.find((player) => player.player_id === cell.occupied_by)?.display_name.slice(0, 1).toUpperCase()
+                                : "";
 
-                            return `
-                              <button class="${classes}" data-row="${rowIndex}" data-col="${colIndex}" ${amCurrentPlayer ? "" : "disabled"}>
-                                ${renderCardFace(cell.card_id, chipSeat, true)}
-                              </button>
-                            `;
-                          })
-                          .join("")}
+                              return `
+                                <button class="${classes}" data-row="${rowIndex}" data-col="${colIndex}" ${amCurrentPlayer ? "" : "disabled"}>
+                                  ${renderCardFace(cell.card_id, chipSeat, true)}
+                                </button>
+                              `;
+                            })
+                            .join("")}
+                        </div>
+                      `,
+                    )
+                    .join("")}
+                </div>
+                <div class="table-rail side right">${amCurrentPlayer ? "Your Move" : "Stand By"}</div>
+              </div>
+              <div class="table-rail bottom">${isLocalGame() ? "Pass the device after each turn" : "Share the room link to join"}</div>
+            </div>
+
+            <div class="corner-panel player-tray">
+              <span class="tray-label">${isLocalGame() ? "Table Players" : "Room Players"}</span>
+              <div class="player-stack compact-player-stack">
+                ${game.players
+                  .map(
+                    (player) => `
+                      <div class="player-chip-row">
+                        <span class="seat-token ${playerColorClass(player.player_id)}"></span>
+                        <div class="player-chip-copy">
+                          <strong>${player.display_name}</strong>
+                          <span>${player.handCount ?? player.hand.length} in hand · ${player.sequences_completed} seq</span>
+                        </div>
                       </div>
                     `,
                   )
                   .join("")}
               </div>
-              <div class="table-rail side right">${amCurrentPlayer ? "Your Move" : "Stand By"}</div>
             </div>
-            <div class="table-rail bottom">${isLocalGame() ? "Pass the device after each turn" : "Share the room link to join"}</div>
-          </div>
-          <aside class="table-side-piles">
-            <div class="pile-stack deck-stack">
-              <div class="stack-card back-card"></div>
-              <div class="stack-card back-card offset-one"></div>
-              <div class="stack-card back-card offset-two"></div>
-              <p>Deck</p>
-              <strong>${game.drawDeckCount}</strong>
-            </div>
-            <div class="pile-stack note-stack">
-              <p>Latest Moves</p>
-              <div class="mini-log">
-                ${game.log
-                  .slice(-3)
-                  .reverse()
-                  .map((entry) => `<span>${entry}</span>`)
+          </section>
+
+          <aside class="utility-rail">
+            <section class="utility-panel status-panel">
+              <div class="utility-head">
+                <span class="tray-label">Game Status</span>
+                <span class="tiny-dot ${turnColor}"></span>
+              </div>
+              <div class="status-matchup">
+                ${game.players
+                  .slice(0, 2)
+                  .map(
+                    (player) => `
+                      <div class="match-player">
+                        <span class="seat-token ${playerColorClass(player.player_id)}"></span>
+                        <span>${player.display_name}</span>
+                      </div>
+                    `,
+                  )
+                  .join('<span class="versus-mark">vs</span>')}
+              </div>
+              <div class="status-scoreboard">
+                ${game.players
+                  .map(
+                    (player) => `
+                      <div class="status-score-row">
+                        <span>${player.display_name}</span>
+                        <strong>${player.sequences_completed} Seq</strong>
+                      </div>
+                    `,
+                  )
                   .join("")}
               </div>
-            </div>
+            </section>
+
+            <section class="utility-panel notes-panel">
+              <div class="utility-head">
+                <span class="tray-label">Table Notes</span>
+                <span class="panel-icon">≡</span>
+              </div>
+              <div class="info-metrics">
+                <div><span>Mode</span><strong>${roomOrLocalLabel}</strong></div>
+                <div><span>Turn</span><strong>${turn?.display_name ?? "Unknown"}</strong></div>
+                <div><span>Winner</span><strong>${winnerName ?? "None"}</strong></div>
+              </div>
+            </section>
+
+            <section class="utility-panel deck-panel">
+              <div class="utility-head">
+                <span class="tray-label">Deck</span>
+                <span class="panel-icon">S</span>
+              </div>
+              <div class="deck-widget">
+                <div class="pile-stack deck-stack">
+                  <div class="stack-card back-card"></div>
+                  <div class="stack-card back-card offset-one"></div>
+                  <div class="stack-card back-card offset-two"></div>
+                </div>
+                <div class="deck-copy">
+                  <strong>${game.drawDeckCount}</strong>
+                  <span>Cards in draw pile</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="utility-panel log-panel">
+              <div class="utility-head">
+                <span class="tray-label">Latest Moves</span>
+              </div>
+              <div class="mini-log">
+                ${recentMoves.map((entry) => `<span>${entry}</span>`).join("")}
+              </div>
+            </section>
           </aside>
         </section>
 
-        <section class="bottom-dock">
-          <div class="tray player-tray">
-            <span class="tray-label">${isLocalGame() ? "Table Players" : "Room Players"}</span>
-            <div class="player-stack">
-              ${game.players
-                .map(
-                  (player) => `
-                    <div class="player-chip-row">
-                      <span class="seat-token ${PLAYER_COLOR_CLASSES[Number(player.player_id.replace("player", "")) - 1]}"></span>
-                      <div class="player-chip-copy">
-                        <strong>${player.display_name}</strong>
-                        <span>${player.handCount ?? player.hand.length} in hand · ${player.sequences_completed} seq</span>
-                      </div>
-                    </div>
-                  `,
-                )
-                .join("")}
-            </div>
+        <section class="command-row">
+          <div class="move-callout">
+            <span class="move-glow"></span>
+            <strong>${winnerName ? `${winnerName} wins` : amCurrentPlayer ? "Your Move" : `${turn?.display_name ?? "Unknown"} Turn`}</strong>
+            <span>${amCurrentPlayer ? "Choose a card" : "Wait for the board to update"}</span>
           </div>
 
-          <div class="tray hand-tray">
+          <div class="tray hand-tray hand-console">
             <div class="hand-banner">${amCurrentPlayer ? "Choose a card" : "Current hand"}</div>
             <div class="hand-fan">
               ${(viewer?.hand ?? [])
@@ -833,18 +903,16 @@ function renderGame() {
             }
           </div>
 
-          <div class="tray info-tray">
-            <span class="tray-label">Table Notes</span>
-            <div class="info-metrics">
-              <div><span>Mode</span><strong>${roomOrLocalLabel}</strong></div>
-              <div><span>Turn</span><strong>${turn?.display_name ?? "Unknown"}</strong></div>
-              <div><span>Winner</span><strong>${winnerName ?? "None"}</strong></div>
+          <div class="utility-panel discard-panel">
+            <div class="utility-head">
+              <span class="tray-label">Quick View</span>
             </div>
             <div class="discard-preview">
               <div class="spread-card">${renderCardFace("QS", "", true)}</div>
               <div class="spread-card">${renderCardFace("7H", "", true)}</div>
               <div class="spread-card">${renderCardFace("10C", "", true)}</div>
             </div>
+            <p class="hand-note">Keep your hand centered. The board is the main focus.</p>
           </div>
         </section>
       </main>
