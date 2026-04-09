@@ -138,7 +138,7 @@ h2 {
 }
 
 .workspace {
-  grid-template-columns: minmax(0, 1.25fr) 360px;
+  grid-template-columns: minmax(0, 1.18fr) 460px;
   align-items: stretch;
   min-height: 0;
 }
@@ -332,7 +332,7 @@ h2 {
 }
 
 .table-frame {
-  width: min(100%, 64vw, calc((100svh - 185px) * 0.76));
+  width: min(100%, 62vw, calc((100svh - 176px) * 0.8));
   border-radius: 34px;
   padding: 10px;
   background: linear-gradient(180deg, #db6ea6 0%, var(--rail) 100%);
@@ -370,8 +370,8 @@ h2 {
 
 .board {
   display: grid;
-  gap: 4px;
-  padding: 10px;
+  gap: 5px;
+  padding: 12px;
   border-radius: 22px;
   background: linear-gradient(180deg, var(--felt) 0%, var(--felt-deep) 100%);
   border: 2px solid rgba(255, 255, 255, 0.55);
@@ -379,7 +379,7 @@ h2 {
 
 .board-row {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   grid-template-columns: repeat(10, minmax(0, 1fr));
 }
 
@@ -400,6 +400,22 @@ h2 {
 
 .cell.selectable {
   filter: drop-shadow(0 0 0.55rem rgba(245, 215, 110, 0.9));
+}
+
+.cell.dimmed {
+  opacity: 0.34;
+  filter: saturate(0.75) brightness(0.92);
+}
+
+.cell.dimmed .playing-card {
+  box-shadow:
+    0 4px 10px rgba(18, 28, 35, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+
+.cell.selectable,
+.cell.locked {
+  opacity: 1;
 }
 
 .cell.locked {
@@ -429,15 +445,34 @@ h2 {
 }
 
 .playing-card.compact .card-corner {
-  font-size: clamp(0.4rem, 0.72vw, 0.64rem);
+  font-size: clamp(0.48rem, 0.8vw, 0.72rem);
+  line-height: 0.82;
 }
 
-.playing-card.compact .card-center.suit {
-  font-size: clamp(1rem, 1.45vw, 1.45rem);
+.playing-card.compact {
+  background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
 }
 
-.playing-card.compact .card-center.face-letter {
-  font-size: clamp(1.05rem, 1.65vw, 1.5rem);
+.playing-card.compact::before {
+  inset: 4px;
+}
+
+.compact-center {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  line-height: 0.9;
+}
+
+.compact-rank {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(0.82rem, 1.28vw, 1.16rem);
+  font-weight: 700;
+}
+
+.compact-suit {
+  font-size: clamp(0.72rem, 1.08vw, 1rem);
 }
 
 .playing-card.red {
@@ -500,6 +535,7 @@ h2 {
   font-weight: 700;
   border: 2px solid rgba(255, 255, 255, 0.76);
   box-shadow: 0 8px 14px rgba(18, 28, 35, 0.18);
+  z-index: 2;
 }
 
 .cell.player1 .chip-token {
@@ -559,29 +595,31 @@ h2 {
 
 .sidebar {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-rows: minmax(0, auto) minmax(0, auto) minmax(0, 1fr);
   min-height: 0;
 }
 
 .panel {
-  padding: 14px;
+  padding: 12px;
   min-height: 0;
 }
 
 .hand {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  align-items: start;
 }
 
 .hand-card {
   position: relative;
-  min-height: 118px;
+  aspect-ratio: 0.68;
+  min-height: 0;
   border: none;
   background: transparent;
   padding: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   cursor: pointer;
   transition: transform 140ms ease;
 }
@@ -592,6 +630,26 @@ h2 {
 
 .hand-card.selected {
   transform: translateY(-4px);
+}
+
+.hand .playing-card {
+  border-radius: 8px;
+}
+
+.hand .playing-card::before {
+  inset: 5px;
+}
+
+.hand .card-corner {
+  font-size: clamp(0.62rem, 0.8vw, 0.78rem);
+}
+
+.hand .card-center.suit {
+  font-size: clamp(1.3rem, 1.75vw, 1.75rem);
+}
+
+.hand .card-center.face-letter {
+  font-size: clamp(1.38rem, 1.9vw, 1.9rem);
 }
 
 .selected-surface {
@@ -619,10 +677,11 @@ h2 {
 
 .badge {
   position: absolute;
-  right: 10px;
-  top: 10px;
+  right: 6px;
+  top: 6px;
   background: rgba(23, 32, 40, 0.8);
   color: white;
+  z-index: 3;
 }
 
 .player-row {
@@ -691,6 +750,10 @@ h2 {
     grid-template-rows: auto;
   }
 
+  .hand {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .lobby-grid {
     grid-template-columns: 1fr;
   }
@@ -729,10 +792,6 @@ h2 {
   }
 
   .hand {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .hand-card {
-    min-height: 126px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

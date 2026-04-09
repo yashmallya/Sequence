@@ -137,13 +137,22 @@ function renderCardFace(code, chipLabel = "", compact = false, selected = false)
     .filter(Boolean)
     .join(" ");
 
+  const center = compact
+    ? `
+      <div class="card-center compact-center">
+        <span class="compact-rank">${card.rank}</span>
+        <span class="compact-suit">${card.symbol}</span>
+      </div>
+    `
+    : `<div class="card-center ${card.isJack ? "face-letter" : "suit"}">${card.isJack ? "J" : card.symbol}</div>`;
+
   return `
     <div class="${cardClass}">
       <div class="card-corner top">
         <span>${card.rank}</span>
         <span>${card.symbol}</span>
       </div>
-      <div class="card-center ${card.isJack ? "face-letter" : "suit"}">${card.isJack ? "J" : card.symbol}</div>
+      ${center}
       <div class="card-corner bottom">
         <span>${card.rank}</span>
         <span>${card.symbol}</span>
@@ -644,11 +653,13 @@ function renderGame() {
                             const isSelectable = amCurrentPlayer && legalMove?.positions.some(
                               ([targetRow, targetCol]) => targetRow === rowIndex && targetCol === colIndex,
                             );
+                            const isDimmed = amCurrentPlayer && legalMove && !isSelectable;
                             const classes = [
                               "cell",
                               cell.occupied_by ? PLAYER_COLOR_CLASSES[Number(cell.occupied_by.replace("player", "")) - 1] : "",
                               cell.is_sequence_locked ? "locked" : "",
                               isSelectable ? "selectable" : "",
+                              isDimmed ? "dimmed" : "",
                             ]
                               .filter(Boolean)
                               .join(" ");
