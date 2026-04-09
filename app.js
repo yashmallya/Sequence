@@ -18,8 +18,6 @@ const SUIT_SYMBOLS = {
 
 const app = document.querySelector("#app");
 
-let view = session?.roomId ? "online" : "menu";
-
 let localForm = {
   playerCount: 2,
   names: ["Player 1", "Player 2", "Player 3", "Player 4"],
@@ -31,6 +29,7 @@ let createForm = {
 };
 
 let session = loadSession();
+let view = session?.roomId ? "online" : "menu";
 let roomState = null;
 let pollTimer = null;
 let selectedHandIndex = null;
