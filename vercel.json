@@ -1,7 +1,3 @@
 {
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs"
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }
