@@ -544,7 +544,7 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 240px;
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 18px;
   align-items: end;
 }
@@ -756,7 +756,7 @@ h2 {
 }
 
 .hand-tray {
-  min-height: 222px;
+  min-height: 196px;
   overflow: visible;
   background: linear-gradient(180deg, rgba(18, 50, 31, 0.96), rgba(12, 34, 22, 0.98));
 }
@@ -774,13 +774,13 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: end;
-  min-height: 152px;
-  padding: 18px 16px 0;
+  min-height: 124px;
+  padding: 10px 8px 0;
 }
 
 .fan-card {
-  width: 92px;
-  margin-left: -22px;
+  width: 74px;
+  margin-left: -12px;
   z-index: var(--fan-order);
   transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate));
   transform-origin: center bottom;
@@ -1306,8 +1306,8 @@ h2 {
 }
 
 .playing-card.compact .card-corner {
-  font-size: clamp(0.5rem, 0.8vw, 0.74rem);
-  line-height: 0.82;
+  font-size: clamp(0.54rem, 0.82vw, 0.78rem);
+  line-height: 1;
 }
 
 .playing-card.compact {
@@ -1322,18 +1322,31 @@ h2 {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 2px;
-  line-height: 0.9;
+  gap: 4px;
+  line-height: 1;
 }
 
 .compact-rank {
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(0.94rem, 1.38vw, 1.26rem);
+  font-size: clamp(0.72rem, 1vw, 0.92rem);
   font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 2px 6px rgba(18, 28, 35, 0.08);
 }
 
 .compact-suit {
-  font-size: clamp(0.82rem, 1.18vw, 1.06rem);
+  font-size: clamp(1rem, 1.38vw, 1.24rem);
+}
+
+.compact-corner {
+  width: auto;
+}
+
+.compact-corner span:last-child {
+  display: none;
 }
 
 .playing-card.red {
@@ -1839,8 +1852,8 @@ h2 {
   }
 
   .fan-card {
-    width: 82px;
-    margin-left: -18px;
+    width: 72px;
+    margin-left: -12px;
   }
 
   .fan-card:first-child {

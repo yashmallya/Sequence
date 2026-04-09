@@ -184,26 +184,46 @@ function renderCardFace(code, chipLabel = "", compact = false, selected = false)
     .filter(Boolean)
     .join(" ");
 
+  const topCorner = compact
+    ? `
+      <div class="card-corner top compact-corner">
+        <span>${card.rank}</span>
+      </div>
+    `
+    : `
+      <div class="card-corner top">
+        <span>${card.rank}</span>
+        <span>${card.symbol}</span>
+      </div>
+    `;
+
+  const bottomCorner = compact
+    ? `
+      <div class="card-corner bottom compact-corner">
+        <span>${card.rank}</span>
+      </div>
+    `
+    : `
+      <div class="card-corner bottom">
+        <span>${card.rank}</span>
+        <span>${card.symbol}</span>
+      </div>
+    `;
+
   const center = compact
     ? `
       <div class="card-center compact-center">
-        <span class="compact-rank">${card.rank}</span>
         <span class="compact-suit">${card.symbol}</span>
+        <span class="compact-rank">${card.rank}</span>
       </div>
     `
     : `<div class="card-center ${card.isJack ? "face-letter" : "suit"}">${card.isJack ? "J" : card.symbol}</div>`;
 
   return `
     <div class="${cardClass}">
-      <div class="card-corner top">
-        <span>${card.rank}</span>
-        <span>${card.symbol}</span>
-      </div>
+      ${topCorner}
       ${center}
-      <div class="card-corner bottom">
-        <span>${card.rank}</span>
-        <span>${card.symbol}</span>
-      </div>
+      ${bottomCorner}
       ${chipLabel ? `<div class="chip-token">${chipLabel}</div>` : ""}
     </div>
   `;
@@ -901,18 +921,6 @@ function renderGame() {
                 `
                 : `<p class="muted hand-note">${amCurrentPlayer ? "Select a card, then click a highlighted board space." : "Wait for your turn. The board updates live."}</p>`
             }
-          </div>
-
-          <div class="utility-panel discard-panel">
-            <div class="utility-head">
-              <span class="tray-label">Quick View</span>
-            </div>
-            <div class="discard-preview">
-              <div class="spread-card">${renderCardFace("QS", "", true)}</div>
-              <div class="spread-card">${renderCardFace("7H", "", true)}</div>
-              <div class="spread-card">${renderCardFace("10C", "", true)}</div>
-            </div>
-            <p class="hand-note">Keep your hand centered. The board is the main focus.</p>
           </div>
         </section>
       </main>
