@@ -209,6 +209,14 @@ function renderCardFace(code, chipLabel = "", compact = false, selected = false)
   `;
 }
 
+function getFanStyle(index, total, selected) {
+  const midpoint = (total - 1) / 2;
+  const offset = index - midpoint;
+  const rotate = offset * 6;
+  const lift = selected ? -18 : -Math.abs(offset) * 2;
+  return `--fan-rotate:${rotate}deg; --fan-lift:${lift}px; --fan-order:${index};`;
+}
+
 function hydratePlayerView(game) {
   return deserializeState({
     ...game,
@@ -686,47 +694,34 @@ function renderGame() {
   const legalMove = getLegalMove();
   const amCurrentPlayer = viewer?.player_id === game.currentPlayerId && !game.winner;
   const roomOrLocalLabel = isLocalGame() ? "Local Game" : `Room ${roomState.roomId}`;
+  const winnerName = game.winner ? game.players.find((player) => player.player_id === game.winner)?.display_name : null;
 
   app.innerHTML = `
-    <div class="shell game-shell">
-      <section class="topbar">
-        <div>
-          <p class="eyebrow">${roomOrLocalLabel}</p>
-          <h1>${isLocalGame() ? "Play Sequence locally on one device." : "Play Sequence live with your room."}</h1>
+    <div class="shell game-shell tabletop-shell">
+      <section class="game-hud">
+        <button id="open-rules" class="hud-round" aria-label="Open rules">?</button>
+        <div class="turn-banner">
+          <div class="turn-seat">
+            <span class="seat-token ${viewer ? PLAYER_COLOR_CLASSES[Number(viewer.player_id.replace("player", "")) - 1] : ""}"></span>
+            <span>${viewer?.display_name ?? "Spectator"}</span>
+          </div>
+          <div class="turn-main">${winnerName ? `${winnerName} wins` : amCurrentPlayer ? "Your Turn" : `${turn?.display_name ?? "Unknown"} Turn`}</div>
+          <div class="turn-badge">${viewer?.sequences_completed ?? 0}</div>
         </div>
-        <div class="actions">
-          <button id="open-rules" class="icon-button" aria-label="Open rules">?</button>
-          <button id="leave-room">${isLocalGame() ? "Exit Local Game" : "Leave Room"}</button>
-        </div>
-      </section>
-
-      <section class="status-strip">
-        <div>
-          <span class="label">Your seat</span>
-          <strong>${viewer?.display_name ?? "Spectator"} · ${viewer?.color ?? "-"}</strong>
-        </div>
-        <div>
-          <span class="label">Current turn</span>
-          <strong>${turn?.display_name ?? "Unknown"}</strong>
-        </div>
-        <div>
-          <span class="label">Deck</span>
-          <strong>${game.drawDeckCount} cards</strong>
-        </div>
-        <div>
-          <span class="label">Winner</span>
-          <strong>${game.winner ? game.players.find((player) => player.player_id === game.winner)?.display_name : "None"}</strong>
+        <div class="hud-brand">Sequence</div>
+        <div class="hud-actions">
+          <button id="leave-room" class="hud-round" aria-label="${isLocalGame() ? "Exit local game" : "Leave room"}">${isLocalGame() ? "×" : "↗"}</button>
         </div>
       </section>
 
       ${errorMessage ? `<p class="error">${errorMessage}</p>` : ""}
 
-      <main class="workspace">
-        <section class="board-panel">
+      <main class="tabletop-stage">
+        <section class="board-zone">
           <div class="table-frame">
-            <div class="table-rail top">Shared board state</div>
+            <div class="table-rail top">Sequence</div>
             <div class="table-middle">
-              <div class="table-rail side left">${isLocalGame() ? "Hot-seat play" : "Room play"}</div>
+              <div class="table-rail side left">${isLocalGame() ? "Local Multiplayer" : roomOrLocalLabel}</div>
               <div class="board">
                 ${game.board
                   .map(
@@ -763,19 +758,62 @@ function renderGame() {
                   )
                   .join("")}
               </div>
-              <div class="table-rail side right">${amCurrentPlayer ? "Your move" : "Waiting"}</div>
+              <div class="table-rail side right">${amCurrentPlayer ? "Your Move" : "Stand By"}</div>
             </div>
-            <div class="table-rail bottom">${isLocalGame() ? "Pass the device after each turn" : "Invite others with the room link"}</div>
+            <div class="table-rail bottom">${isLocalGame() ? "Pass the device after each turn" : "Share the room link to join"}</div>
           </div>
+          <aside class="table-side-piles">
+            <div class="pile-stack deck-stack">
+              <div class="stack-card back-card"></div>
+              <div class="stack-card back-card offset-one"></div>
+              <div class="stack-card back-card offset-two"></div>
+              <p>Deck</p>
+              <strong>${game.drawDeckCount}</strong>
+            </div>
+            <div class="pile-stack note-stack">
+              <p>Latest Moves</p>
+              <div class="mini-log">
+                ${game.log
+                  .slice(-3)
+                  .reverse()
+                  .map((entry) => `<span>${entry}</span>`)
+                  .join("")}
+              </div>
+            </div>
+          </aside>
         </section>
 
-        <aside class="sidebar">
-          <section class="panel">
-            <h2>Your hand</h2>
-            <div class="hand">
+        <section class="bottom-dock">
+          <div class="tray player-tray">
+            <span class="tray-label">${isLocalGame() ? "Table Players" : "Room Players"}</span>
+            <div class="player-stack">
+              ${game.players
+                .map(
+                  (player) => `
+                    <div class="player-chip-row">
+                      <span class="seat-token ${PLAYER_COLOR_CLASSES[Number(player.player_id.replace("player", "")) - 1]}"></span>
+                      <div class="player-chip-copy">
+                        <strong>${player.display_name}</strong>
+                        <span>${player.handCount ?? player.hand.length} in hand · ${player.sequences_completed} seq</span>
+                      </div>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+
+          <div class="tray hand-tray">
+            <div class="hand-banner">${amCurrentPlayer ? "Choose a card" : "Current hand"}</div>
+            <div class="hand-fan">
               ${(viewer?.hand ?? [])
-                .map((card, index) => `
-                  <button class="hand-card ${selectedHandIndex === index ? "selected" : ""}" data-hand-index="${index}" ${amCurrentPlayer ? "" : "disabled"}>
+                .map((card, index, cards) => `
+                  <button
+                    class="hand-card fan-card ${selectedHandIndex === index ? "selected" : ""}"
+                    data-hand-index="${index}"
+                    style="${getFanStyle(index, cards.length, selectedHandIndex === index)}"
+                    ${amCurrentPlayer ? "" : "disabled"}
+                  >
                     ${renderCardFace(card, "", false, selectedHandIndex === index)}
                     ${selectedHandIndex === index && legalMove?.isDeadCard ? '<span class="badge">Dead</span>' : ""}
                   </button>
@@ -785,44 +823,30 @@ function renderGame() {
             ${
               amCurrentPlayer && legalMove
                 ? `
-                  <div class="selection-info">
+                  <div class="selection-info compact-selection">
                     <p><strong>${legalMove.card.code}</strong> · ${legalMove.action}</p>
                     <p>${legalMove.isDeadCard ? "Both matching spaces are blocked. Turn this card in." : `${legalMove.positions.length} legal target(s) available.`}</p>
                     <button id="turn-in-dead" ${legalMove.isDeadCard ? "" : "disabled"}>Turn In Dead Card</button>
                   </div>
                 `
-                : `<p class="muted">${amCurrentPlayer ? "Select a card, then click a highlighted board space." : "Wait for your turn. The board updates live."}</p>`
+                : `<p class="muted hand-note">${amCurrentPlayer ? "Select a card, then click a highlighted board space." : "Wait for your turn. The board updates live."}</p>`
             }
-          </section>
+          </div>
 
-          <section class="panel">
-            <h2>Players</h2>
-            ${game.players
-              .map(
-                (player) => `
-                  <div class="player-row">
-                    <div>
-                      <strong>${player.display_name}</strong>
-                      <p>${player.handCount ?? player.hand.length} in hand · ${player.discardCount ?? player.discard_pile.length} discarded</p>
-                    </div>
-                    <div class="seq-count">${player.sequences_completed} seq</div>
-                  </div>
-                `,
-              )
-              .join("")}
-          </section>
-
-          <section class="panel">
-            <h2>Turn log</h2>
-            <div class="log">
-              ${game.log
-                .slice(-10)
-                .reverse()
-                .map((entry) => `<p>${entry}</p>`)
-                .join("")}
+          <div class="tray info-tray">
+            <span class="tray-label">Table Notes</span>
+            <div class="info-metrics">
+              <div><span>Mode</span><strong>${roomOrLocalLabel}</strong></div>
+              <div><span>Turn</span><strong>${turn?.display_name ?? "Unknown"}</strong></div>
+              <div><span>Winner</span><strong>${winnerName ?? "None"}</strong></div>
             </div>
-          </section>
-        </aside>
+            <div class="discard-preview">
+              <div class="spread-card">${renderCardFace("QS", "", true)}</div>
+              <div class="spread-card">${renderCardFace("7H", "", true)}</div>
+              <div class="spread-card">${renderCardFace("10C", "", true)}</div>
+            </div>
+          </div>
+        </section>
       </main>
 
       ${
