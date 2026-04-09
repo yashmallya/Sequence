@@ -544,17 +544,18 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 190px minmax(0, 980px);
+  gap: 14px;
   align-items: end;
+  justify-content: center;
 }
 
 .move-callout {
   align-self: center;
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 14px 18px;
+  gap: 4px;
+  padding: 12px 16px;
   border-radius: 999px;
   color: #f6edd8;
   background:
@@ -568,14 +569,14 @@ h2 {
 
 .move-callout strong {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 1.05rem;
+  font-size: 0.94rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .move-callout span:last-child {
   color: #cfc4a3;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
 }
 
 .move-glow {
@@ -589,7 +590,9 @@ h2 {
 }
 
 .hand-console {
-  padding-top: 18px;
+  padding-top: 12px;
+  justify-self: center;
+  width: min(100%, 980px);
 }
 
 .compact-player-stack {
@@ -756,31 +759,32 @@ h2 {
 }
 
 .hand-tray {
-  min-height: 196px;
+  min-height: 164px;
   overflow: visible;
   background: linear-gradient(180deg, rgba(18, 50, 31, 0.96), rgba(12, 34, 22, 0.98));
 }
 
 .hand-banner {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-align: center;
   color: #efe3c3;
   font-family: "Space Grotesk", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  font-size: 0.82rem;
 }
 
 .hand-fan {
   display: flex;
   justify-content: center;
   align-items: end;
-  min-height: 124px;
-  padding: 10px 8px 0;
+  min-height: 98px;
+  padding: 6px 6px 0;
 }
 
 .fan-card {
-  width: 74px;
-  margin-left: -12px;
+  width: 62px;
+  margin-left: -8px;
   z-index: var(--fan-order);
   transform: translateY(var(--fan-lift)) rotate(var(--fan-rotate));
   transform-origin: center bottom;
@@ -795,14 +799,17 @@ h2 {
 }
 
 .compact-selection {
-  margin-top: 10px;
+  margin-top: 6px;
   justify-items: center;
   text-align: center;
+  gap: 4px;
+  font-size: 0.86rem;
 }
 
 .hand-note {
-  margin-top: 10px;
+  margin-top: 6px;
   text-align: center;
+  font-size: 0.84rem;
 }
 
 .info-metrics {
